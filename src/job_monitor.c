@@ -20,24 +20,57 @@ static void *monitor_worker(void *arg)
 {
     (void)arg;
 
+    JobState *last_states = NULL;
+    size_t last_count = 0;
+
     while (monitor_running) {
         pthread_mutex_lock(&jobs_mutex);
 
-        for (size_t i = 0; i < job_count; i++) {
-            const char *state =
-                (jobs[i].state == JOB_RUNNING) ? "RUNNING" : "FINISHED";
+        if (job_count > last_count) {
+            JobState *new_states =
+                realloc(last_states, job_count * sizeof(JobState));
 
-            printf("[monitor] Job %d | PID %d | %s\n",
-                   jobs[i].id,
-                   (int)jobs[i].pid,
-                   state);
+            if (new_states != NULL) {
+                last_states = new_states;
+
+                for (size_t i = last_count; i < job_count; i++) {
+                    last_states[i] = (JobState)-1;
+
+                    printf("[monitor] Job %d | PID %d | RUNNING\n",
+                           jobs[i].id,
+                           (int)jobs[i].pid);
+                }
+
+                last_count = job_count;
+            }
+        }
+
+        for (size_t i = 0; i < job_count; i++) {
+            if (last_states != NULL &&
+                jobs[i].state != last_states[i]) {
+
+                if (last_states[i] != (JobState)-1) {
+                    const char *state =
+                        jobs[i].state == JOB_RUNNING
+                            ? "RUNNING"
+                            : "FINISHED";
+
+                    printf("[monitor] Job %d | PID %d | %s\n",
+                           jobs[i].id,
+                           (int)jobs[i].pid,
+                           state);
+                }
+
+                last_states[i] = jobs[i].state;
+            }
         }
 
         pthread_mutex_unlock(&jobs_mutex);
 
-        sleep(2);
+        sleep(1);
     }
 
+    free(last_states);
     return NULL;
 }
 
