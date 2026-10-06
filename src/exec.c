@@ -183,7 +183,8 @@ static int run_builtin_with_redirection(const Command *cmd,
         strcmp(cmd->argv[0], "exit") != 0 &&
         strcmp(cmd->argv[0], "pwd") != 0 &&
         strcmp(cmd->argv[0], "help") != 0 &&
-        strcmp(cmd->argv[0], "memstat") != 0) {
+        strcmp(cmd->argv[0], "memstat") != 0 &&
+        strcmp(cmd->argv[0], "jobs") != 0) {
         return 0;
     }
 
@@ -388,6 +389,12 @@ void run_pipeline(const Pipeline *pipeline,
             *last_status = 0;
             return;
         }
+    }
+
+    if (strcmp(first_cmd->argv[0], "jobs") == 0) {
+        job_monitor_print();
+        *last_status = 0;
+        return;
     }
 
     size_t pipe_count = n > 1 ? 2 * (n - 1) : 0;
