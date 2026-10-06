@@ -1,6 +1,6 @@
 /* builtins.c — Week 5: PATH + built-ins, exit codes implementation */
 #include "builtins.h"
-
+#include "memstat.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +13,7 @@ static const char *BUILTIN_NAMES[] = {
     "exit",
     "pwd",
     "help",
+    "memstat",
     NULL
 };
 
@@ -117,6 +118,9 @@ void run_builtin(const Command *cmd,
         builtin_pwd(last_status);
     } else if (strcmp(cmd->argv[0], "help") == 0) {
         builtin_help(last_status);
+    } else if (strcmp(cmd->argv[0], "memstat") == 0) {
+        memstat_print();
+        *last_status = 0;
     } else {
         fprintf(stderr,
                 "shellforge: %s: not actually a builtin\n",
