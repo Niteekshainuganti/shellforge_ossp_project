@@ -95,7 +95,19 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* stderr redirection: 2> or 2>> */
+        /* Background operator */
+    if (c == '&') {
+        if (had_content) {
+            push_token(out_tokens, &cur);
+            had_content = 0;
+        }
+
+        push_operator(out_tokens, "&");
+        i++;
+        continue;
+    }
+
+    /* stderr redirection: 2> or 2>> */
         if (c == '2' && i + 1 < n && line[i + 1] == '>') {
             if (had_content) {
                 push_token(out_tokens, &cur);

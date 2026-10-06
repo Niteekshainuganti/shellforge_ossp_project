@@ -11,6 +11,7 @@ static void command_init(Command *cmd) {
     cmd->error_file = NULL;
     cmd->append_output = 0;
     cmd->append_error = 0;
+    cmd->background = 0;
 }
 
 static void command_free(Command *cmd) {
@@ -112,6 +113,11 @@ int parse_pipeline(const DVector *tokens,
         const char *token = tokens->items[i];
 
         /* Pipeline separator */
+        if (strcmp(token, "&") == 0) {
+            current->background = 1;
+            continue;
+        }
+
         if (strcmp(token, "|") == 0) {
             if (current->argc == 0) {
                 command_free(current);

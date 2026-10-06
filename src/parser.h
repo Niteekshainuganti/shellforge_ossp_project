@@ -14,6 +14,8 @@ typedef struct {
 
     int append_output;
     int append_error;
+
+    int background;
 } Command;
 
 typedef struct {
