@@ -6,25 +6,19 @@
 #include <string.h>
 
 static void push_token(DVector *out, DString *cur) {
-    if (cur->len == 0) {
-        return;
-    }
+    if (cur->len == 0) return;
 
     char *tok = strdup(ds_cstr(cur));
-
-    if (tok != NULL) {
+    if (tok != NULL)
         dv_push(out, tok);
-    }
 
     ds_clear(cur);
 }
 
 static void push_operator(DVector *out, const char *op) {
     char *tok = strdup(op);
-
-    if (tok != NULL) {
+    if (tok != NULL)
         dv_push(out, tok);
-    }
 }
 
 int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
@@ -41,10 +35,8 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
     while (i < n) {
         char c = line[i];
 
-        /* Single or double quotes */
         if (c == '\'' || c == '"') {
             char quote = c;
-
             i++;
             had_content = 1;
 
@@ -63,7 +55,6 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* Backslash escape */
         if (c == '\\' && i + 1 < n) {
             ds_append_char(&cur, line[i + 1]);
             had_content = 1;
@@ -71,7 +62,6 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* Whitespace */
         if (isspace((unsigned char)c)) {
             if (had_content) {
                 push_token(out_tokens, &cur);
@@ -82,7 +72,6 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* Pipe */
         if (c == '|') {
             if (had_content) {
                 push_token(out_tokens, &cur);
@@ -90,24 +79,21 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             }
 
             push_operator(out_tokens, "|");
-
             i++;
             continue;
         }
 
-        /* Background operator */
-    if (c == '&') {
-        if (had_content) {
-            push_token(out_tokens, &cur);
-            had_content = 0;
+        if (c == '&') {
+            if (had_content) {
+                push_token(out_tokens, &cur);
+                had_content = 0;
+            }
+
+            push_operator(out_tokens, "&");
+            i++;
+            continue;
         }
 
-        push_operator(out_tokens, "&");
-        i++;
-        continue;
-    }
-
-    /* stderr redirection: 2> or 2>> */
         if (c == '2' && i + 1 < n && line[i + 1] == '>') {
             if (had_content) {
                 push_token(out_tokens, &cur);
@@ -125,7 +111,6 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* stdin/stdout redirection */
         if (c == '<' || c == '>') {
             if (had_content) {
                 push_token(out_tokens, &cur);
@@ -146,15 +131,13 @@ int tokenize(const char *line, DVector *out_tokens, const char **err_msg) {
             continue;
         }
 
-        /* Normal character */
         ds_append_char(&cur, c);
         had_content = 1;
         i++;
     }
 
-    if (had_content) {
+    if (had_content)
         push_token(out_tokens, &cur);
-    }
 
     ds_free(&cur);
     return 0;
