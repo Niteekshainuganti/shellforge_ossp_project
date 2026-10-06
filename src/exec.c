@@ -1,5 +1,6 @@
 #include "exec.h"
 #include "signals.h"
+#include "job_monitor.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -456,6 +457,13 @@ void run_pipeline(const Pipeline *pipeline,
         }
 
         pids[spawned++] = pid;
+
+        const char *job_command =
+            ((Command *)pipeline->commands.items[i])->argc > 0
+                ? ((Command *)pipeline->commands.items[i])->argv[0]
+                : "unknown";
+
+        job_monitor_add(pid, job_command);
     }
 
     close_all_pipes(pipe_fds, pipe_count);
@@ -474,6 +482,11 @@ void run_pipeline(const Pipeline *pipeline,
             perror("shellforge: waitpid");
             continue;
         }
+
+        job_monitor_mark_finished(
+            pids[i],
+            status_to_exit_code(status)
+        );
 
         if (i == spawned - 1) {
             final_status = status_to_exit_code(status);

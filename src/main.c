@@ -11,6 +11,7 @@
 #include "parser.h"
 #include "exec.h"
 #include "signals.h"
+#include "job_monitor.h"
 
 static int read_line(DString *out) {
     ds_clear(out);
@@ -53,6 +54,7 @@ static void print_prompt(int last_status) {
 
 int main(void) {
     shell_install_signal_handlers();
+    job_monitor_init();
 
     DString line;
     ds_init(&line);
@@ -99,6 +101,7 @@ int main(void) {
         }
     }
 
+    job_monitor_shutdown();
     ds_free(&line);
 
     return last_status;

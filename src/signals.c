@@ -6,16 +6,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+static volatile sig_atomic_t sigchld_pending = 0;
+
 static void sigchld_handler(int signo) {
     (void)signo;
-
-    pid_t pid;
-    int status;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        (void)status;
-        (void)pid;
-    }
+    sigchld_pending = 1;
 }
 
 static void sigint_sigtstp_handler(int signo) {

@@ -1,5 +1,5 @@
 CC      := gcc
-CFLAGS  := -Wall -Wextra -std=gnu11 -g -O0
+CFLAGS  := -Wall -Wextra -std=gnu11 -g -O0 -pthread
 SRC_DIR := src
 BUILD_DIR := build
 BIN     := shellforge
