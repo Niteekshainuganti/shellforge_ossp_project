@@ -1,4 +1,4 @@
-/* parser.h — Week 3: Pipeline AST */
+/* parser.h — Pipeline AST + I/O redirection */
 #ifndef SHELLFORGE_PARSER_H
 #define SHELLFORGE_PARSER_H
 
@@ -7,13 +7,21 @@
 typedef struct {
     char **argv;
     int argc;
+
+    char *input_file;
+    char *output_file;
+    char *error_file;
+
+    int append_output;
+    int append_error;
 } Command;
 
 typedef struct {
     DVector commands;
 } Pipeline;
 
-int parse_pipeline(const DVector *tokens, Pipeline *pipeline_out,
+int parse_pipeline(const DVector *tokens,
+                   Pipeline *pipeline_out,
                    const char **err_msg);
 
 void pipeline_free(Pipeline *p);

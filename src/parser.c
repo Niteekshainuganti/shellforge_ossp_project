@@ -1,110 +1,215 @@
-/* parser.c — Week 3: Pipeline AST builder */
 #include "parser.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static Command *command_new(void) {
-    Command *cmd = calloc(1, sizeof(Command));
-
-    if (!cmd) {
-        fprintf(stderr, "shellforge: out of memory (command)\n");
-        exit(1);
-    }
-
+static void command_init(Command *cmd) {
     cmd->argv = NULL;
     cmd->argc = 0;
-
-    return cmd;
-}
-
-static void command_add_arg(Command *cmd, const char *word) {
-    char **new_argv = realloc(
-        cmd->argv,
-        (size_t)(cmd->argc + 2) * sizeof(char *)
-    );
-
-    if (!new_argv) {
-        fprintf(stderr, "shellforge: out of memory (argv)\n");
-        exit(1);
-    }
-
-    cmd->argv = new_argv;
-    cmd->argv[cmd->argc] = strdup(word);
-    cmd->argc++;
-    cmd->argv[cmd->argc] = NULL;
+    cmd->input_file = NULL;
+    cmd->output_file = NULL;
+    cmd->error_file = NULL;
+    cmd->append_output = 0;
+    cmd->append_error = 0;
 }
 
 static void command_free(Command *cmd) {
-    if (!cmd) return;
+    if (!cmd) {
+        return;
+    }
 
     for (int i = 0; i < cmd->argc; i++) {
         free(cmd->argv[i]);
     }
 
     free(cmd->argv);
-    free(cmd);
+    free(cmd->input_file);
+    free(cmd->output_file);
+    free(cmd->error_file);
+
+    command_init(cmd);
+}
+
+static int argv_push(Command *cmd, const char *token) {
+    char **new_argv = realloc(
+        cmd->argv,
+        sizeof(char *) * (size_t)(cmd->argc + 2)
+    );
+
+    if (!new_argv) {
+        return -1;
+    }
+
+    cmd->argv = new_argv;
+
+    cmd->argv[cmd->argc] = strdup(token);
+
+    if (!cmd->argv[cmd->argc]) {
+        return -1;
+    }
+
+    cmd->argc++;
+    cmd->argv[cmd->argc] = NULL;
+
+    return 0;
+}
+
+static int set_redirection(Command *cmd,
+                           const char *op,
+                           const char *filename) {
+    if (strcmp(op, "<") == 0) {
+        free(cmd->input_file);
+        cmd->input_file = strdup(filename);
+        return cmd->input_file ? 0 : -1;
+    }
+
+    if (strcmp(op, ">") == 0) {
+        free(cmd->output_file);
+        cmd->output_file = strdup(filename);
+        cmd->append_output = 0;
+        return cmd->output_file ? 0 : -1;
+    }
+
+    if (strcmp(op, ">>") == 0) {
+        free(cmd->output_file);
+        cmd->output_file = strdup(filename);
+        cmd->append_output = 1;
+        return cmd->output_file ? 0 : -1;
+    }
+
+    if (strcmp(op, "2>") == 0 || strcmp(op, "2>>") == 0) {
+        free(cmd->error_file);
+        cmd->error_file = strdup(filename);
+
+        if (!cmd->error_file) {
+            return -1;
+        }
+
+        cmd->append_error = (strcmp(op, "2>>") == 0);
+        return 0;
+    }
+
+    return -1;
 }
 
 int parse_pipeline(const DVector *tokens,
                    Pipeline *pipeline_out,
                    const char **err_msg) {
+    *err_msg = NULL;
+
     dv_init(&pipeline_out->commands);
 
-    size_t n = dv_len(tokens);
+    Command *current = malloc(sizeof(Command));
 
-    if (n == 0) {
-        return 0;
-    }
-
-    Command *cur = command_new();
-    int cur_has_args = 0;
-    int prev_was_pipe = 1;
-
-    for (size_t i = 0; i < n; i++) {
-        const char *tok = (const char *)dv_get(tokens, i);
-
-        if (strcmp(tok, "|") == 0) {
-            if (prev_was_pipe) {
-                command_free(cur);
-                pipeline_free(pipeline_out);
-                *err_msg = "syntax error: unexpected '|'";
-                return -1;
-            }
-
-            dv_push(&pipeline_out->commands, cur);
-
-            cur = command_new();
-            cur_has_args = 0;
-            prev_was_pipe = 1;
-            continue;
-        }
-
-        command_add_arg(cur, tok);
-        cur_has_args = 1;
-        prev_was_pipe = 0;
-    }
-
-    if (prev_was_pipe) {
-        command_free(cur);
-        pipeline_free(pipeline_out);
-        *err_msg = "syntax error: expected command after '|'";
+    if (!current) {
+        *err_msg = "out of memory";
         return -1;
     }
 
-    if (cur_has_args) {
-        dv_push(&pipeline_out->commands, cur);
-    } else {
-        command_free(cur);
+    command_init(current);
+
+    for (size_t i = 0; i < tokens->len; i++) {
+        const char *token = tokens->items[i];
+
+        /* Pipeline separator */
+        if (strcmp(token, "|") == 0) {
+            if (current->argc == 0) {
+                command_free(current);
+                free(current);
+                *err_msg = "empty command in pipeline";
+                return -1;
+            }
+
+            dv_push(&pipeline_out->commands, current);
+
+            current = malloc(sizeof(Command));
+
+            if (!current) {
+                *err_msg = "out of memory";
+                return -1;
+            }
+
+            command_init(current);
+            continue;
+        }
+
+        /* Redirection operators */
+        if (strcmp(token, "<") == 0 ||
+            strcmp(token, ">") == 0 ||
+            strcmp(token, ">>") == 0 ||
+            strcmp(token, "2>") == 0 ||
+            strcmp(token, "2>>") == 0) {
+
+            if (i + 1 >= tokens->len) {
+                command_free(current);
+                free(current);
+                *err_msg = "redirection requires a filename";
+                return -1;
+            }
+
+            const char *filename = tokens->items[++i];
+
+            if (strcmp(filename, "|") == 0 ||
+                strcmp(filename, "<") == 0 ||
+                strcmp(filename, ">") == 0 ||
+                strcmp(filename, ">>") == 0 ||
+                strcmp(filename, "2>") == 0 ||
+                strcmp(filename, "2>>") == 0) {
+
+                command_free(current);
+                free(current);
+                *err_msg = "redirection requires a filename";
+                return -1;
+            }
+
+            if (set_redirection(current, token, filename) != 0) {
+                command_free(current);
+                free(current);
+                *err_msg = "out of memory";
+                return -1;
+            }
+
+            continue;
+        }
+
+        /* Normal command argument */
+        if (argv_push(current, token) != 0) {
+            command_free(current);
+            free(current);
+            *err_msg = "out of memory";
+            return -1;
+        }
     }
+
+    if (current->argc == 0) {
+        command_free(current);
+        free(current);
+
+        if (pipeline_out->commands.len == 0) {
+            return 0;
+        }
+
+        *err_msg = "empty command in pipeline";
+        return -1;
+    }
+
+    dv_push(&pipeline_out->commands, current);
 
     return 0;
 }
 
 void pipeline_free(Pipeline *p) {
-    for (size_t i = 0; i < dv_len(&p->commands); i++) {
-        command_free((Command *)dv_get(&p->commands, i));
+    if (!p) {
+        return;
+    }
+
+    for (size_t i = 0; i < p->commands.len; i++) {
+        Command *cmd = p->commands.items[i];
+
+        if (cmd) {
+            command_free(cmd);
+            free(cmd);
+        }
     }
 
     dv_free(&p->commands);
