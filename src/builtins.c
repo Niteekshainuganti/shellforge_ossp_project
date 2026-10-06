@@ -1,6 +1,7 @@
 /* builtins.c — Week 5: PATH + built-ins, exit codes implementation */
 #include "builtins.h"
 #include "memstat.h"
+#include "job_monitor.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@ static const char *BUILTIN_NAMES[] = {
     "pwd",
     "help",
     "memstat",
+    "jobs",
     NULL
 };
 
@@ -120,6 +122,9 @@ void run_builtin(const Command *cmd,
         builtin_help(last_status);
     } else if (strcmp(cmd->argv[0], "memstat") == 0) {
         memstat_print();
+        *last_status = 0;
+    } else if (strcmp(cmd->argv[0], "jobs") == 0) {
+        job_monitor_print();
         *last_status = 0;
     } else {
         fprintf(stderr,
